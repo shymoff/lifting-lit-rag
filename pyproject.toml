@@ -1,0 +1,13 @@
+[project]
+name = "lifting-lit-rag"
+version = "0.1.0"
+description = "Local RAG over open-access strength-training literature, with a golden evaluation set and CI quality gates"
+requires-python = ">=3.13"
+dependencies = [
+    "chromadb>=1.5.9",
+    "ollama>=0.6.2",
+    "pandas>=3.0.5",
+    "pytest>=9.1.1",
+    "requests>=2.34.2",
+    "streamlit>=1.63.0",
+]

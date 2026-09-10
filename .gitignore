@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- dane i modele ---
+data/raw/*
+!data/raw/sample_article.json
+data/processed/
+chroma_db/
+logs/*.db
+!logs/sample_queries.db
+*.gguf
+
+# --- sekrety ---
+.env
+.env.local
