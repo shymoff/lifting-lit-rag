@@ -800,6 +800,7 @@ dependencies = [
     { name = "pytest" },
     { name = "requests" },
     { name = "streamlit" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -810,6 +811,7 @@ requires-dist = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "streamlit", specifier = ">=1.63.0" },
+    { name = "tqdm", specifier = ">=4.70.0" },
 ]
 
 [[package]]

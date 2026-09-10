@@ -12,7 +12,7 @@ EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 TOOL = "lifting-lit-rag"
 RATE_LIMIT_SLEEP = 0.4  # NCBI allows 3 req/s without an API key
 BATCH_SIZE = 20
-RETMAX_PER_QUERY = 60
+RETMAX_PER_QUERY = 100
 TARGET_TOTAL = 250
 
 RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
@@ -24,18 +24,23 @@ ALLOWED_LICENSES = {
 }
 
 QUERIES = [
-    "resistance training[Title/Abstract] AND hypertrophy[Title/Abstract]",
-    "resistance training[Title/Abstract] AND training volume[Title/Abstract]",
-    "protein intake[Title/Abstract] AND muscle protein synthesis[Title/Abstract]",
-    "resistance training[Title/Abstract] AND training frequency[Title/Abstract]",
-    "velocity based training[Title/Abstract]",
-    "resistance training[Title/Abstract] AND training to failure[Title/Abstract]",
-    "resistance training[Title/Abstract] AND range of motion[Title/Abstract]",
-    "concurrent training[Title/Abstract] AND interference effect[Title/Abstract]",
-    "creatine supplementation[Title/Abstract] AND strength[Title/Abstract]",
-    "blood flow restriction[Title/Abstract] AND resistance training[Title/Abstract]",
-    "rest interval[Title/Abstract] AND resistance training[Title/Abstract]",
-    "resistance training[Title/Abstract] AND older adults[Title/Abstract]",
+    # Multi-word phrases must be quoted: an unquoted "a b"[Title/Abstract] only
+    # scopes the field tag to the last word, leaving the rest as an unscoped
+    # free-text term matched anywhere in the article (pulls in false positives,
+    # e.g. an unrelated engineering paper mentioning "resistance" and "training"
+    # in different senses).
+    '"resistance training"[Title/Abstract] AND hypertrophy[Title/Abstract]',
+    '"resistance training"[Title/Abstract] AND "training volume"[Title/Abstract]',
+    '"protein intake"[Title/Abstract] AND "muscle protein synthesis"[Title/Abstract]',
+    '"resistance training"[Title/Abstract] AND "training frequency"[Title/Abstract]',
+    '"velocity based training"[Title/Abstract]',
+    '"resistance training"[Title/Abstract] AND "training to failure"[Title/Abstract]',
+    '"resistance training"[Title/Abstract] AND "range of motion"[Title/Abstract]',
+    '"concurrent training"[Title/Abstract] AND "interference effect"[Title/Abstract]',
+    '"creatine supplementation"[Title/Abstract] AND strength[Title/Abstract]',
+    '"blood flow restriction"[Title/Abstract] AND "resistance training"[Title/Abstract]',
+    '"rest interval"[Title/Abstract] AND "resistance training"[Title/Abstract]',
+    '"resistance training"[Title/Abstract] AND "older adults"[Title/Abstract]',
 ]
 
 
@@ -76,6 +81,48 @@ def _text(el: ET.Element | None) -> str:
     return re.sub(r"\s+", " ", " ".join(el.itertext())).strip()
 
 
+def _extract_section(sec_el: ET.Element) -> str:
+    """Render a <sec> as 'Title\\nparagraph\\n\\nparagraph', recursing into subsections.
+
+    Chunking (Phase 2) needs real paragraph/section breaks to split on, so this
+    keeps them as newlines instead of collapsing everything to a single line.
+    """
+    title = _text(sec_el.find("./title"))
+    paragraphs = [_text(p) for p in sec_el.findall("./p")]
+    paragraphs = [p for p in paragraphs if p]
+    subsections = [_extract_section(sub) for sub in sec_el.findall("./sec")]
+    subsections = [s for s in subsections if s]
+
+    body_parts = paragraphs + subsections
+    body = "\n\n".join(body_parts)
+    if title and body:
+        # Blank-line join, not "\n": chunk.py's header detection splits on "\n\n"
+        # and needs the title on its own short block, not fused with the first paragraph.
+        return f"{title}\n\n{body}"
+    return title or body
+
+
+def _extract_body(body_el: ET.Element | None) -> str:
+    if body_el is None:
+        return ""
+    sections = [_extract_section(sec) for sec in body_el.findall("./sec")]
+    sections = [s for s in sections if s]
+    if sections:
+        return "\n\n".join(sections)
+    # Some articles put paragraphs directly under <body> with no <sec> wrapper.
+    return "\n\n".join(_text(p) for p in body_el.findall(".//p") if _text(p))
+
+
+def _extract_abstract(abstract_el: ET.Element | None) -> str:
+    if abstract_el is None:
+        return ""
+    paragraphs = [_text(p) for p in abstract_el.findall(".//p")]
+    paragraphs = [p for p in paragraphs if p]
+    if paragraphs:
+        return "\n\n".join(paragraphs)
+    return _text(abstract_el)  # fallback for plain-text abstracts with no <p>
+
+
 def _license_type(article: ET.Element) -> tuple[str, str] | None:
     license_el = article.find(".//permissions/license")
     if license_el is None:
@@ -110,7 +157,7 @@ def parse_article(article: ET.Element) -> tuple[dict | None, str]:
     if license_info is None:
         return None, "license"
 
-    body = _text(article.find(".//body"))
+    body = _extract_body(article.find(".//body"))
     if not body:
         return None, "no_body"
 
@@ -123,7 +170,7 @@ def parse_article(article: ET.Element) -> tuple[dict | None, str]:
     record = {
         "pmcid": pmcid,
         "title": _text(article.find(".//article-title")),
-        "abstract": _text(article.find(".//abstract")),
+        "abstract": _extract_abstract(article.find(".//abstract")),
         "body": body,
         "year": year_el.text.strip() if year_el is not None else None,
         "journal": _text(article.find(".//journal-title")),
