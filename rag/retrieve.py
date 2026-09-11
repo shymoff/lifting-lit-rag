@@ -35,10 +35,10 @@ def search(query: str, k: int = 5) -> list[dict]:
     )
 
     hits = []
-    for text, metadata, distance in zip(
-        results["documents"][0], results["metadatas"][0], results["distances"][0]
+    for chunk_id, text, metadata, distance in zip(
+        results["ids"][0], results["documents"][0], results["metadatas"][0], results["distances"][0]
     ):
-        hits.append({"text": text, "score": 1 - distance, **metadata})
+        hits.append({"id": chunk_id, "text": text, "score": 1 - distance, **metadata})
     return hits
 
 

@@ -91,11 +91,16 @@ def hits_to_sources(hits: list[dict]) -> list[Source]:
     ]
 
 
-def stream_tokens(question: str, hits: list[dict]):
+def stream_tokens(question: str, hits: list[dict], stats: dict | None = None):
     """Stream the answer token-by-token for already-retrieved `hits`.
 
     Split out from `answer()` so a caller (the Streamlit app) can cache
     retrieval separately from generation and render tokens as they arrive.
+
+    If `stats` is given, it's updated in place once the stream's final chunk
+    arrives, with Ollama's own token counts (prompt_eval_count, eval_count)
+    rather than re-deriving them - the plan's own guidance not to count
+    tokens by hand when Ollama already reports them.
     """
     prompt = build_prompt(question, hits)
     stream = ollama.chat(
@@ -109,6 +114,9 @@ def stream_tokens(question: str, hits: list[dict]):
     )
     for chunk in stream:
         yield chunk["message"]["content"]
+        if stats is not None and chunk.get("done"):
+            stats["n_tokens_in"] = chunk.get("prompt_eval_count")
+            stats["n_tokens_out"] = chunk.get("eval_count")
 
 
 def answer(question: str, k: int = 3) -> Answer:
