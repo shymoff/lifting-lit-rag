@@ -7,8 +7,20 @@ dependencies = [
     "chromadb>=1.5.9",
     "ollama>=0.6.2",
     "pandas>=3.0.5",
-    "pytest>=9.1.1",
     "requests>=2.34.2",
     "streamlit>=1.63.0",
     "tqdm>=4.70.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.7",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "unit: fast tests with no model or network dependency",
+    "llm: tests that call Ollama (embeddings and/or generation) - skipped in CI",
 ]

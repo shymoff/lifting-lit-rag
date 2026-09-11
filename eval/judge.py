@@ -18,7 +18,7 @@ def _extract_json(text: str) -> dict:
     """format="json" mostly works, but small models still sometimes wrap the
     object in prose or a code fence - salvage it defensively rather than trust
     the raw response."""
-    match = re.search(r"\{.*\}", text, re.S)
+    match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         raise ValueError(f"no JSON object found in judge output: {text!r}")
     return json.loads(match.group(0))

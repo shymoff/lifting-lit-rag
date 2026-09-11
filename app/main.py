@@ -7,7 +7,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
-from rag.generate import GUARDRAIL_MESSAGE, hits_to_sources, is_medical_question, stream_tokens
+from rag.generate import (
+    GUARDRAIL_MESSAGE,
+    hits_to_sources,
+    is_medical_question,
+    stream_tokens,
+)
 from rag.retrieve import search
 
 st.set_page_config(page_title="lifting-lit-rag", page_icon="\U0001f3cb", layout="wide")

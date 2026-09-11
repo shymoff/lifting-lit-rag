@@ -7,6 +7,7 @@ from pathlib import Path
 from rag.retrieve import search
 
 GOLDEN_SET_PATH = Path(__file__).resolve().parent / "golden_set.jsonl"
+RESULTS_PATH = Path(__file__).resolve().parent / "results" / "retrieval_latest.json"
 K = 5
 
 
@@ -61,5 +62,15 @@ def evaluate(k: int = K) -> dict:
     return {"k": k, "per_category": summary}
 
 
+def evaluate_and_save(k: int = K) -> dict:
+    """Run evaluate() and persist the summary so test_eval_gate.py can check
+    thresholds against it without needing Ollama/Chroma at test time."""
+    result = evaluate(k)
+    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RESULTS_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nWrote retrieval metrics to {RESULTS_PATH}")
+    return result
+
+
 if __name__ == "__main__":
-    evaluate()
+    evaluate_and_save()
