@@ -20,19 +20,30 @@ make must be followed by a (Source N) citation, e.g. "Training volume affects
 hypertrophy (Source 2)." Use at least one such citation in every answer. The
 source texts may already contain bracketed reference numbers from their own
 original papers, like [12] - those are NOT your sources and must never be used
-as a citation; only ever cite using the "Source N" labels given here. If the
-sources do not contain enough information to answer the question, say so
-explicitly instead of guessing. Do not use any outside knowledge."""
+as a citation; only ever cite using the "Source N" labels given here.
+
+You may and should combine information across multiple sources when a
+question is broader than any single source alone - that is normal synthesis,
+not a violation. Only decline to answer if NONE of the sources are actually
+about the topic the question asks about (e.g. the question asks about running
+periodization but every source is about resistance training injuries). If at
+least one source is genuinely on-topic, answer using it and cite it, even if
+it only partially covers the question. If none of the sources are on-topic,
+respond with exactly: "The sources provided do not contain information to
+answer this question." Do not invent facts that aren't in any source, and do
+not use any outside knowledge."""
 
 # Plan asks for exactly this: one `if` plus a prompt mention, not a full
-# classifier - questions about dosing/injury/treatment get a canned refusal.
+# classifier - questions seeking personal medical advice (injury/treatment/
+# diagnosis) get a canned refusal. Deliberately excludes "dose" and
+# "rehabilitation": those are standard exercise-science research vocabulary
+# (dose-response, rehabilitation protocols) and blocked legitimate literature
+# questions when included - see eval/results/20260911-210723.json.
 MEDICAL_KEYWORDS = (
-    "dose", "dosage", "dosing",
     "injury", "injuries", "injured",
     "treatment", "treating", "treat",
     "diagnose", "diagnosis",
     "prescription", "medication",
-    "rehabilitation", "rehab",
     "surgery",
 )
 
@@ -49,6 +60,7 @@ class Source:
     title: str
     url: str
     section: str
+    text: str
 
 
 @dataclass
@@ -73,7 +85,10 @@ def build_prompt(question: str, hits: list[dict]) -> str:
 
 
 def hits_to_sources(hits: list[dict]) -> list[Source]:
-    return [Source(pmcid=h["pmcid"], title=h["title"], url=h["url"], section=h["section"]) for h in hits]
+    return [
+        Source(pmcid=h["pmcid"], title=h["title"], url=h["url"], section=h["section"], text=h["text"])
+        for h in hits
+    ]
 
 
 def stream_tokens(question: str, hits: list[dict]):

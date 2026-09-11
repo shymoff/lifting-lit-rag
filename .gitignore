@@ -226,6 +226,9 @@ logs/*.db
 !logs/sample_queries.db
 *.gguf
 
+# --- eval intermediates (final results in eval/results/*.json stay tracked) ---
+eval/results/generations_latest.json
+
 # --- sekrety ---
 .env
 .env.local
