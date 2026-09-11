@@ -59,12 +59,12 @@ class Answer:
     latency_s: float
 
 
-def _is_medical_question(question: str) -> bool:
+def is_medical_question(question: str) -> bool:
     lowered = question.lower()
     return any(keyword in lowered for keyword in MEDICAL_KEYWORDS)
 
 
-def _build_prompt(question: str, hits: list[dict]) -> str:
+def build_prompt(question: str, hits: list[dict]) -> str:
     numbered = "\n\n".join(
         f"Source {i} ({hit['pmcid']}, {hit['section']}): {hit['text']}"
         for i, hit in enumerate(hits, 1)
@@ -72,14 +72,38 @@ def _build_prompt(question: str, hits: list[dict]) -> str:
     return f"Sources:\n{numbered}\n\nQuestion: {question}"
 
 
+def hits_to_sources(hits: list[dict]) -> list[Source]:
+    return [Source(pmcid=h["pmcid"], title=h["title"], url=h["url"], section=h["section"]) for h in hits]
+
+
+def stream_tokens(question: str, hits: list[dict]):
+    """Stream the answer token-by-token for already-retrieved `hits`.
+
+    Split out from `answer()` so a caller (the Streamlit app) can cache
+    retrieval separately from generation and render tokens as they arrive.
+    """
+    prompt = build_prompt(question, hits)
+    stream = ollama.chat(
+        model=GENERATOR_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        options={"num_ctx": NUM_CTX, "temperature": 0, "seed": SEED},
+        stream=True,
+    )
+    for chunk in stream:
+        yield chunk["message"]["content"]
+
+
 def answer(question: str, k: int = 3) -> Answer:
     start = time.perf_counter()
 
-    if _is_medical_question(question):
+    if is_medical_question(question):
         return Answer(text=GUARDRAIL_MESSAGE, sources=[], refused=True, latency_s=time.perf_counter() - start)
 
     hits = search(question, k=k)
-    prompt = _build_prompt(question, hits)
+    prompt = build_prompt(question, hits)
 
     response = ollama.chat(
         model=GENERATOR_MODEL,
@@ -90,13 +114,9 @@ def answer(question: str, k: int = 3) -> Answer:
         options={"num_ctx": NUM_CTX, "temperature": 0, "seed": SEED},
     )
 
-    sources = [
-        Source(pmcid=h["pmcid"], title=h["title"], url=h["url"], section=h["section"])
-        for h in hits
-    ]
     return Answer(
         text=response["message"]["content"],
-        sources=sources,
+        sources=hits_to_sources(hits),
         refused=False,
         latency_s=time.perf_counter() - start,
     )
