@@ -170,12 +170,3 @@ actual behavior. Verified this gate can actually fail: temporarily
 corrupted a committed result's synthesis faithfulness score, watched
 `test_generation_quality_has_not_regressed` go red, then restored the
 real data and confirmed green again.
-
-## Licensing
-
-Code in this repository is MIT-licensed (see `LICENSE`). Retrieved
-publications remain under their original licenses (256 CC BY, 1 CC BY-SA in
-the current corpus) and are **not redistributed** here beyond one sample
-article kept for format reference (`data/raw/sample_article.json`); the
-ingestion script (`ingest/fetch_pmc.py`) fetches full text from PMC's
-Open Access Subset at run time via the E-utilities API.
