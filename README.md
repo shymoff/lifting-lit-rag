@@ -107,12 +107,6 @@ above are after fixing both - full history in `eval/results/`.
 
 ## Quickstart
 
-Tested hardware: Ryzen 5 3600, GTX 1660 Super (6GB VRAM). Everything here
-runs comfortably in that budget; the generator uses ~2.4GB VRAM at 100% GPU
-offload, the judge (batch-only) runs at ~82% GPU/18% CPU offload on this
-card and is noticeably slower - that's fine since it's never in the
-interactive path.
-
 ```bash
 # 1. Install Ollama (https://ollama.com) and pull the three models
 ollama pull nomic-embed-text
@@ -126,8 +120,8 @@ uv sync
 #    polite to PMC's API)
 uv run python -m ingest.fetch_pmc
 
-# 4. Chunk and index (embeddings via Ollama; ~20-25 min for ~3,500 chunks
-#    on a GTX 1660 Super - this is the slow step, budget time for it)
+# 4. Chunk and index (embeddings via Ollama; ~20-25 min for ~3,500 chunks -
+#    this is the slow step, budget time for it)
 uv run python -m ingest.chunk
 uv run python -m ingest.index
 
@@ -185,58 +179,3 @@ the current corpus) and are **not redistributed** here beyond one sample
 article kept for format reference (`data/raw/sample_article.json`); the
 ingestion script (`ingest/fetch_pmc.py`) fetches full text from PMC's
 Open Access Subset at run time via the E-utilities API.
-
-## What I'd do next
-
-- **Hybrid search** (dense + BM25): the plan flagged this as optional and
-  it's the first thing cut for time; worth comparing against pure vector
-  search once there's a stable baseline to improve on.
-- **A real tokenizer for chunking**: `ingest/chunk.py` uses word count as a
-  proxy for the ~500-800 token target because no tokenizer dependency was
-  added. It's close enough in practice, but a real tokenizer would make
-  chunk sizing precise instead of approximate.
-- **Fix the remaining `unanswerable` failures**: even after tuning, 1 of 5
-  unanswerable questions still gets a hedged, semi-fabricated answer rather
-  than a clean decline. Worth a dedicated look at whether a stricter
-  retrieval-score cutoff (rather than a prompt instruction alone) would
-  catch this more reliably.
-- **Bigger golden set**: 50 questions is enough to see real signal, but a
-  larger set (especially more `contested` and `unanswerable` cases) would
-  make the category-level numbers less noisy.
-- **A pluggable backend interface**: swap the local Ollama+Chroma stack for
-  a cloud backend (e.g. Snowflake Cortex) behind a shared `embed`/`search`/
-  `complete` interface - deliberately not attempted here per the plan's own
-  warning that two half-finished backends are worse than one working one.
-
-## What I learned
-
-- **Query construction bugs are easy to miss and expensive when found
-  late.** An unquoted multi-word phrase in a PMC search query (`resistance
-  training[Title/Abstract]` instead of `"resistance training"[Title/Abstract]`)
-  silently broadens the search to match unrelated fields, and it took a
-  spot-check of actual article titles (not just counts) to catch it - one
-  candidate was an industrial heating-element paper that matched on
-  "resistance" and "training" in unrelated senses.
-- **Prompt fixes trade off against each other, and only a real eval catches
-  that.** Strengthening the anti-fabrication instruction to fix
-  `unanswerable` handling (0.40 → 0.80 declined) quietly broke `synthesis`
-  and `contested` faithfulness/relevance by ~1-1.2 points each, because the
-  model started over-refusing legitimate multi-source questions. Without a
-  category-level eval harness already in place, that regression would have
-  shipped silently - the fix that "obviously" worked for the failure I was
-  looking at actively hurt two other categories.
-- **A "simple keyword guardrail" isn't as safe a default as it sounds.**
-  Blocking questions containing "dose" or "rehabilitation" seemed like an
-  obviously safe interpretation of "block medical advice questions," but
-  those are core exercise-science research vocabulary ("dose-response,"
-  "rehabilitation protocols"), and the guardrail ended up blocking
-  legitimate literature questions. The fix was narrowing the keyword list,
-  not making the classifier smarter - simple heuristics need their false
-  positives checked against the actual domain, not just the failure case
-  that motivated them.
-- **Retrieval and generation quality are genuinely separable, and testing
-  only end-to-end answers hides which one to fix.** Measuring hit-rate/MRR
-  with zero model calls first, before ever generating an answer, made it
-  possible to isolate "the sources exist and are found" from "the model
-  used them well" - without that split, a generation problem could easily
-  be misdiagnosed as a retrieval problem or vice versa.
